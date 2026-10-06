@@ -1,0 +1,9 @@
+# Inference only — enough to run serve.py and the demo page.
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pillow>=11.0
+python-multipart>=0.0.9
+torch>=2.5
+torchvision>=0.20
+
+# Training only (pip install -r requirements-train.txt)

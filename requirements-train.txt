@@ -1,0 +1,9 @@
+-r requirements.txt
+
+# Food-101 comes from the HuggingFace mirror.
+datasets>=3.0
+
+# Routes Python TLS through the OS trust store. Needed on machines whose
+# antivirus intercepts HTTPS, where the download otherwise dies with
+# CERTIFICATE_VERIFY_FAILED despite the certificate being fine.
+truststore>=0.9

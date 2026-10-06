@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Food-101 classifier tester</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f6f4;
+    --panel: #ffffff;
+    --ink: #17171a;
+    --muted: #6b6b73;
+    --line: #e2e2dd;
+    --accent: #2f6f4f;
+    --accent-soft: #e6f0ea;
+    --warn: #9a3412;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16161a;
+      --panel: #1e1e23;
+      --ink: #ececf0;
+      --muted: #9a9aa4;
+      --line: #2e2e36;
+      --accent: #5fbf8d;
+      --accent-soft: #1d3329;
+      --warn: #f0a882;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 24px 16px 48px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  header { margin-bottom: 20px; }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    vertical-align: middle; margin-left: 6px;
+  }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 16px;
+  }
+  #drop {
+    border: 1.5px dashed var(--line); border-radius: 12px;
+    aspect-ratio: 1; display: grid; place-items: center; cursor: pointer;
+    text-align: center; padding: 16px; color: var(--muted);
+    transition: border-color .15s, background .15s; overflow: hidden; position: relative;
+  }
+  #drop.over { border-color: var(--accent); background: var(--accent-soft); }
+  #drop img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+  #drop .hint { font-size: 13px; }
+  input[type=file] { display: none; }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  button {
+    font: inherit; font-weight: 600; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink);
+    padding: 8px 14px; border-radius: 10px; cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .45; cursor: default; }
+  .result { display: flex; flex-direction: column; gap: 10px; }
+  .pred { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline; }
+  .pred .name { font-weight: 600; }
+  .pred.top .name { color: var(--accent); }
+  .pred .pct { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+  .bar { grid-column: 1 / -1; height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; }
+  .bar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .empty { color: var(--muted); font-size: 13px; }
+  .err { color: var(--warn); font-size: 13px; white-space: pre-wrap; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Food-101 &middot; ResNet-50 <span class="badge">demo</span></h1>
+    <div class="sub">Fine-tuned on the official Food-101 split. 83.46% top-1, 96.35% top-5 on 25,250 held-out photos.</div>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <div id="drop">
+        <div class="hint">Drop an image here<br>or click to choose</div>
+      </div>
+      <input type="file" id="file" accept="image/*">
+      <div class="row">
+        <button class="primary" id="go" disabled>Classify</button>
+        <button id="clear" disabled>Clear</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div id="out" class="empty">No image classified yet.</div>
+      <div class="meta" id="meta"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+const go = document.getElementById('go');
+const clearBtn = document.getElementById('clear');
+const out = document.getElementById('out');
+const meta = document.getElementById('meta');
+let current = null;
+
+function setFile(f) {
+  if (!f || !f.type.startsWith('image/')) return;
+  current = f;
+  const url = URL.createObjectURL(f);
+  drop.innerHTML = '';
+  const img = new Image();
+  img.src = url;
+  drop.appendChild(img);
+  go.disabled = false;
+  clearBtn.disabled = false;
+  out.className = 'empty';
+  out.textContent = 'Ready — press Classify.';
+  meta.textContent = f.name + ' · ' + (f.size / 1024).toFixed(0) + ' KB';
+}
+
+drop.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => setFile(e.target.files[0]));
+['dragenter', 'dragover'].forEach((ev) =>
+  drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach((ev) =>
+  drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', (e) => setFile(e.dataTransfer.files[0]));
+
+clearBtn.addEventListener('click', () => {
+  current = null;
+  fileInput.value = '';
+  drop.innerHTML = '<div class="hint">Drop an image here<br>or click to choose</div>';
+  go.disabled = true;
+  clearBtn.disabled = true;
+  out.className = 'empty';
+  out.textContent = 'No image classified yet.';
+  meta.textContent = '';
+});
+
+go.addEventListener('click', async () => {
+  if (!current) return;
+  go.disabled = true;
+  out.className = 'empty';
+  out.textContent = 'Classifying…';
+
+  const body = new FormData();
+  body.append('file', current);
+
+  try {
+    const res = await fetch('/v1/classify-upload?top_k=5', { method: 'POST', body });
+    if (!res.ok) {
+      const detail = await res.text();
+      out.className = 'err';
+      out.textContent = 'HTTP ' + res.status + '\n' + detail;
+      return;
+    }
+    const data = await res.json();
+    const top = data.predictions[0];
+
+    out.className = 'result';
+    out.innerHTML = '';
+    data.predictions.forEach((p, i) => {
+      const pct = (p.confidence * 100).toFixed(1);
+      const el = document.createElement('div');
+      el.className = 'pred' + (i === 0 ? ' top' : '');
+      el.innerHTML =
+        '<div class="name">' + p.class.replace(/_/g, ' ') + '</div>' +
+        '<div class="pct">' + pct + '%</div>' +
+        '<div class="bar"><span style="width:' + pct + '%"></span></div>';
+      out.appendChild(el);
+    });
+
+    const spread = top.confidence - (data.predictions[1]?.confidence ?? 0);
+    meta.innerHTML =
+      data.inference_ms + ' ms' +
+      (spread < 0.05
+        ? '<br><strong>Low margin</strong> — top two are within ' +
+          (spread * 100).toFixed(1) + ' points, treat as uncertain.'
+        : '');
+  } catch (err) {
+    out.className = 'err';
+    out.textContent = 'Request failed: ' + err.message;
+  } finally {
+    go.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

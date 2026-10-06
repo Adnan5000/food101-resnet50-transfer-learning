@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ruff_cache/
+.pytest_cache/
+
+# Checkpoints are release assets, not repository contents.
+weights/
+*.pt
+*.pth
+
+# The dataset cache is ~10GB.
+data/
